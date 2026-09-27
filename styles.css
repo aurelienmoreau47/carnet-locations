@@ -338,12 +338,6 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   box-shadow: 0 1px 3px rgba(31, 42, 46, 0.15);
 }
 .seg button.warn[aria-checked="true"] { background: var(--warn-tint); color: var(--warn); }
-.theo { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 12px; background: var(--bg); font-size: 13px; color: var(--muted); }
-.theo .v { font-family: var(--serif); font-size: 26px; font-weight: 600; }
-.link-btn {
-  align-self: flex-start; min-height: 36px; margin-top: 4px; padding: 0; border: 0; background: none;
-  color: var(--a2); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px;
-}
 .money {
   height: 54px; padding: 0 16px; border: 1.5px solid var(--ink); border-radius: 12px;
   display: flex; align-items: center; gap: 6px; background: var(--surface);

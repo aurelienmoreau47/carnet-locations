@@ -23,8 +23,7 @@ Application de gestion des réservations des trois appartements : saisie des ré
 ## Règles de calcul
 
 - **Nuits** : date de départ moins date d'arrivée. Le jour du départ est libre pour une nouvelle arrivée.
-- **Tarif théorique** : moins de 7 nuits → prix à la nuit ; de 7 à 27 nuits → prix « dès 7 nuits » par nuit ; 28 nuits et plus → prix au mois (un mois = 28 à 31 nuits), les nuits en plus au prix « dès 7 nuits ». Il est enregistré au moment de la saisie : changer la grille plus tard ne modifie pas les anciennes réservations.
-- **Tarif réel** : saisi à la main. Pour Airbnb, c'est le montant net reçu.
+- **Tarif** : saisi à la main à chaque réservation. Pour Airbnb, c'est le montant net reçu. (Les colonnes `tarif_theorique` et `tarif_*` de la base ne sont plus utilisées.)
 - **Récap** : un séjour à cheval sur deux mois est réparti selon le nombre de nuits passées dans chaque mois.
 - **Occupation** : nuits louées ÷ (jours de la période × 3 appartements).
 

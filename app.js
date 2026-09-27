@@ -87,7 +87,6 @@
   const eur = (x) => EUR.format(round2(Number(x) || 0));
   const eur0 = (x) => EUR0.format(Math.round(Number(x) || 0));
   const pct = (x) => `${Math.round((x || 0) * 100)} %`;
-  const pct1 = (x) => `${(x * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`;
   const montantInput = (x) => (x === '' || x == null ? '' : round2(Number(x)).toFixed(2).replace('.', ','));
   const parseMontant = (s) => {
     const t = String(s == null ? '' : s).replace(/[\s  €]/g, '').replace(',', '.');
@@ -103,7 +102,7 @@
   const byArr = (x, y) => toN(x.arrivee) - toN(y.arrivee) || toN(x.depart) - toN(y.depart);
 
   const canEdit = () => S.role === 'gestion';
-  const apt = (id) => S.apts.find((a) => Number(a.id) === Number(id)) || { id, nom: `Appartement ${id}`, tarif_nuit: 0, tarif_semaine: 0, tarif_mois: 0 };
+  const apt = (id) => S.apts.find((a) => Number(a.id) === Number(id)) || { id, nom: `Appartement ${id}` };
 
   function range(r) {
     const a = toN(r.arrivee), d = toN(r.depart);
@@ -116,29 +115,6 @@
     if (n === t) return "Aujourd'hui";
     if (n === t + 1) return 'Demain';
     return cap(dJour(n));
-  }
-
-  /* Tarif théorique à partir de la grille de l'appartement :
-   * moins de 7 nuits : prix à la nuit
-   * de 7 à 27 nuits : prix « dès 7 nuits » (par nuit)
-   * 28 nuits et plus : prix au mois (1 mois = 28 à 31 nuits),
-   *   les nuits au-delà sont comptées au prix « dès 7 nuits ». */
-  function tarifTheorique(a, n) {
-    if (!a || !(n > 0)) return null;
-    const nuit = Number(a.tarif_nuit) || 0;
-    const sem = Number(a.tarif_semaine) || nuit;
-    const mois = Number(a.tarif_mois) || 0;
-    if (!nuit && !sem && !mois) return { total: 0, detail: '', vide: true };
-    if (n >= 28 && mois > 0) {
-      const m = Math.floor((n + 2) / 30) || 1;
-      const reste = Math.max(0, n - m * 30);
-      return {
-        total: m * mois + reste * sem,
-        detail: `${m} mois × ${eur(mois)}` + (reste ? ` + ${plural(reste, 'nuit')} × ${eur(sem)}` : '')
-      };
-    }
-    if (n >= 7 && sem > 0) return { total: n * sem, detail: `${n} nuits × ${eur(sem)} · tarif dès 7 nuits` };
-    return { total: n * nuit, detail: `${plural(n, 'nuit')} × ${eur(nuit)} · tarif à la nuit` };
   }
 
   function conflit(aptId, arrivee, depart, excludeId) {
@@ -252,13 +228,13 @@
     const t = today();
     const r = (client, appartement, a, d, personnes, canal, paiement, tarif, paye, notes) => ({
       id: uid(), client, appartement, arrivee: fromN(t + a), depart: fromN(t + d), personnes, canal,
-      tarif_theorique: null, tarif_reel: tarif, paiement, paye, notes: notes || null
+      tarif_reel: tarif, paiement, paye, notes: notes || null
     });
     return {
       apts: [
-        { id: 1, nom: 'Appartement 1', tarif_nuit: 45, tarif_semaine: 35, tarif_mois: 700 },
-        { id: 2, nom: 'Appartement 2', tarif_nuit: 40, tarif_semaine: 30, tarif_mois: 680 },
-        { id: 3, nom: 'Appartement 3', tarif_nuit: 40, tarif_semaine: 30, tarif_mois: 560 }
+        { id: 1, nom: 'Appartement 1' },
+        { id: 2, nom: 'Appartement 2' },
+        { id: 3, nom: 'Appartement 3' }
       ],
       resas: [
         r('Christophe', 1, -62, -48, 1, 'contact', 'virement', 400, true),
@@ -327,8 +303,7 @@
       S.resas = (d.resas || []).map((r) => Object.assign({}, r, {
         appartement: Number(r.appartement),
         personnes: Number(r.personnes) || 1,
-        tarif_reel: Number(r.tarif_reel) || 0,
-        tarif_theorique: r.tarif_theorique == null ? null : Number(r.tarif_theorique)
+        tarif_reel: Number(r.tarif_reel) || 0
       }));
       return true;
     } catch (e) {
@@ -780,9 +755,8 @@
             <div class="seg" role="radiogroup" aria-labelledby="lbl-canal">
               ${radio('data-canal', 'airbnb', F.canal, 'Airbnb')}${radio('data-canal', 'contact', F.canal, 'Contact direct')}
             </div>
-            <div id="f-theo" class="theo"></div>
             <div class="field">
-              <label for="f-reel" id="lbl-reel">Tarif réel (négocié)</label>
+              <label for="f-reel" id="lbl-reel">Tarif</label>
               <div class="money"><input id="f-reel" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(montantInput(F.tarif_reel))}"><span aria-hidden="true">€</span></div>
               <p id="f-ecart" class="ecart" aria-live="polite"></p>
             </div>
@@ -817,14 +791,6 @@
     const reelInput = $('#f-reel');
 
     const n = () => (isDate(F.arrivee) && isDate(F.depart) ? toN(F.depart) - toN(F.arrivee) : 0);
-    // Le tarif théorique enregistré est conservé tant que l'appartement et les dates ne changent pas.
-    const theo = () => {
-      if (existing && existing.tarif_theorique != null && F.appartement === existing.appartement
-        && F.arrivee === existing.arrivee && F.depart === existing.depart) {
-        return { total: existing.tarif_theorique, detail: 'Calculé à la création de la réservation' };
-      }
-      return tarifTheorique(apt(F.appartement), n());
-    };
 
     const setChecked = (attr, val) => $$(`[${attr}]`, form).forEach((b) => b.setAttribute('aria-checked', String(b.getAttribute(attr) === String(val))));
 
@@ -846,32 +812,10 @@
         dispo.className = 'dispo ok';
         dispo.innerHTML = `<span>${ic('check', 18)}Appart ${F.appartement} libre sur ces dates</span><strong>${plural(nb, 'nuit')}</strong>`;
       }
-      // Tarif théorique
-      const th = nb > 0 ? theo() : null;
-      const box = $('#f-theo');
-      if (!th) {
-        box.innerHTML = '<span>Tarif théorique</span><span>Il sera calculé une fois les dates choisies.</span>';
-      } else if (th.vide) {
-        box.innerHTML = '<span>Tarif théorique</span><span>Renseignez les tarifs de cet appartement dans Réglages pour le calculer.</span>';
-      } else {
-        box.innerHTML = `<span>Tarif théorique (calculé)</span><span class="v">${eur(th.total)}</span><span>${th.detail}</span>`
-          + (ro ? '' : '<button type="button" class="link-btn" data-act="use-theo">Reprendre ce montant</button>');
-      }
-      // Libellé du tarif réel
-      $('#lbl-reel').textContent = F.canal === 'airbnb' ? "Montant net reçu d'Airbnb" : 'Tarif réel (négocié)';
-      // Écart entre tarif réel et théorique
+      // Libellé du tarif et prix par nuit
+      $('#lbl-reel').textContent = F.canal === 'airbnb' ? "Montant net reçu d'Airbnb" : 'Tarif';
       const reel = parseMontant(reelInput.value);
-      const bits = [];
-      if (!isNaN(reel) && nb > 0) {
-        if (th && !th.vide && th.total > 0) {
-          const diff = reel - th.total;
-          if (diff < -0.005) bits.push(`Remise de ${eur(-diff)} (−${pct1(-diff / th.total)})`);
-          else if (diff > 0.005) bits.push(`Supplément de ${eur(diff)}`);
-          else bits.push('Identique au tarif théorique');
-        }
-        bits.push(`soit ${eur(reel / nb)} la nuit`);
-      }
-      $('#f-ecart').textContent = bits.join(' · ');
+      $('#f-ecart').textContent = !isNaN(reel) && nb > 0 ? `Soit ${eur(reel / nb)} la nuit` : '';
       // Client déjà venu
       const hint = $('#f-client-hint');
       const key = F.client.trim().toLowerCase();
@@ -902,9 +846,6 @@
         F.paiement = b.dataset.pay; setChecked('data-pay', F.paiement);
       } else if (b.dataset.paye) {
         F.paye = b.dataset.paye === '1'; setChecked('data-paye', b.dataset.paye);
-      } else if (b.dataset.act === 'use-theo') {
-        const th = theo();
-        if (th && !th.vide) { reelInput.value = montantInput(th.total); refresh(); }
       }
     });
 
@@ -929,7 +870,7 @@
       const manque = [];
       if (!F.client.trim()) manque.push('le nom du client');
       if (!isDate(F.arrivee) || !isDate(F.depart)) manque.push('les dates');
-      if (isNaN(reel) || reel < 0) manque.push('le tarif réel');
+      if (isNaN(reel) || reel < 0) manque.push('le tarif');
       if (!F.paiement) manque.push('le mode de paiement');
       let msg = manque.length ? `Il manque ${manque.join(', ')}.` : '';
       if (!msg && nb <= 0) msg = "La date de départ doit être après la date d'arrivée.";
@@ -937,7 +878,6 @@
       if (msg) { err.textContent = msg; err.hidden = false; err.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
       err.hidden = true;
 
-      const th = theo();
       const row = {
         client: F.client.trim(),
         appartement: F.appartement,
@@ -945,7 +885,6 @@
         depart: F.depart,
         personnes: F.personnes,
         canal: F.canal,
-        tarif_theorique: th && !th.vide ? round2(th.total) : null,
         tarif_reel: round2(reel),
         paiement: F.paiement,
         paye: F.paye,
@@ -1151,27 +1090,17 @@
 
   function viewReglages() {
     const ro = !canEdit();
-    const champ = (id, name, label, val) => `<div class="field">
-      <label for="t-${name}-${id}">${label}</label>
-      <div class="money sm"><input id="t-${name}-${id}" name="${name}" inputmode="decimal" autocomplete="off" value="${esc(montantInput(val))}"><span aria-hidden="true">€</span></div>
-    </div>`;
     return `
       <header class="page-head"><h1 class="h1">Réglages</h1></header>
-      <h2 class="section-label" style="margin-top:0">Tarifs de base</h2>
-      <p class="muted" style="margin-bottom:12px">Ils servent à calculer le tarif théorique. Le tarif réel reste libre à chaque réservation.</p>
+      <h2 class="section-label" style="margin-top:0">Appartements</h2>
       ${S.apts.map((x) => `
         <form class="card apt-form a${x.id}" data-apt-form="${x.id}" novalidate>
           <fieldset${ro ? ' disabled' : ''}>
             <div class="apt-form-head">
               <span class="badge sm">${x.id}</span>
               <input class="name-input" name="nom" value="${esc(x.nom)}" aria-label="Nom de l'appartement ${x.id}" maxlength="40">
+              ${ro ? '' : '<button type="submit" class="btn btn-ghost btn-sm">Enregistrer</button>'}
             </div>
-            <div class="three">
-              ${champ(x.id, 'tarif_nuit', 'La nuit', x.tarif_nuit)}
-              ${champ(x.id, 'tarif_semaine', 'Dès 7 nuits (par nuit)', x.tarif_semaine)}
-              ${champ(x.id, 'tarif_mois', 'Au mois', x.tarif_mois)}
-            </div>
-            ${ro ? '' : '<button type="submit" class="btn btn-ghost btn-sm">Enregistrer</button>'}
           </fieldset>
         </form>`).join('')}
 
@@ -1207,12 +1136,12 @@
     };
     const cell = (v) => { const s = String(v == null ? '' : v); return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const num = (x) => (x == null || x === '' ? '' : round2(Number(x)).toFixed(2).replace('.', ','));
-    const head = ['Client', 'Appartement', 'Arrivée', 'Départ', 'Nuits', 'Personnes', 'Canal', 'Paiement', 'Statut', 'Tarif théorique', 'Tarif réel']
+    const head = ['Client', 'Appartement', 'Arrivée', 'Départ', 'Nuits', 'Personnes', 'Canal', 'Paiement', 'Statut', 'Tarif']
       .concat(withPeriod ? ['Nuits dans la période', 'Montant sur la période'] : [], ['Notes']);
     const lines = rs.slice().sort(byArr).map((r) => [
       txt(r.client), r.appartement, dFr(r.arrivee), dFr(r.depart), nights(r), r.personnes,
       CANAUX[r.canal] || r.canal, PAIEMENTS[r.paiement] || r.paiement, r.paye ? 'Payé' : 'À encaisser',
-      num(r.tarif_theorique), num(r.tarif_reel)
+      num(r.tarif_reel)
     ].concat(withPeriod ? [inter(r, a, b), num(part(r, a, b))] : [], [txt(r.notes)]).map(cell).join(';'));
     const csv = '﻿' + [head.map(cell).join(';')].concat(lines).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -1289,20 +1218,13 @@
     if (!canEdit()) return;
     const id = Number(form.dataset.aptForm);
     const nom = form.elements.nom.value.trim() || `Appartement ${id}`;
-    const vals = {};
-    for (const k of ['tarif_nuit', 'tarif_semaine', 'tarif_mois']) {
-      const raw = form.elements[k].value.trim();
-      const v = raw === '' ? 0 : parseMontant(raw);
-      if (isNaN(v) || v < 0) { toast('Un des tarifs est mal écrit (exemple : 45 ou 35,50).', true); form.elements[k].focus(); return; }
-      vals[k] = round2(v);
-    }
     const btn = form.querySelector('button[type=submit]');
     btn.disabled = true;
     try {
-      await S.store.updateApt(id, Object.assign({ nom }, vals));
+      await S.store.updateApt(id, { nom });
       await reload();
       render();
-      toast('Tarifs enregistrés');
+      toast('Nom enregistré');
     } catch (ex) {
       toast(traduireErreur(ex), true);
       btn.disabled = false;
