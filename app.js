@@ -297,6 +297,7 @@
   function app() { return document.getElementById('app'); }
 
   async function boot() {
+    registerSW();
     S.store = CLOUD ? CloudStore : LocalStore;
     try {
       S.store.init();
@@ -347,7 +348,6 @@
       });
     }
     route();
-    registerSW();
   }
 
   function registerSW() {
