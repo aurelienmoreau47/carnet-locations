@@ -28,10 +28,12 @@ create table public.reservations (
   arrivee         date not null,
   depart          date not null,
   personnes       smallint not null default 1 check (personnes between 1 and 20),
-  canal           text not null check (canal in ('airbnb', 'contact')),
-  tarif_theorique numeric(10,2),
+  canal           text not null constraint reservations_canal_check check (canal in ('airbnb', 'contact', 'leboncoin')),
+  tarif_theorique numeric(10,2),                                     -- plus utilisé
   tarif_reel      numeric(10,2) not null check (tarif_reel >= 0),   -- pour Airbnb : montant net reçu
-  paiement        text not null check (paiement in ('airbnb', 'virement', 'especes', 'cheque')),
+  paiement        text not null constraint reservations_paiement_check check (paiement in ('airbnb', 'virement', 'especes', 'cheque', 'leboncoin')),
+  draps_montant   numeric(10,2) check (draps_montant >= 0),          -- supplément draps (vide = pas de draps)
+  draps_paiement  text check (draps_paiement in ('airbnb', 'virement', 'especes', 'cheque', 'leboncoin')),
   paye            boolean not null default false,
   notes           text,
   cree_le         timestamptz not null default now(),

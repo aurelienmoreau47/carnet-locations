@@ -14,9 +14,10 @@
   const CLOUD = Boolean(CFG.supabaseUrl && CFG.supabaseKey);
 
   const APTS = [1, 2, 3];
-  const CANAUX = { airbnb: 'Airbnb', contact: 'Contact direct' };
-  const PAIEMENTS = { airbnb: 'Airbnb', virement: 'Virement', especes: 'Espèces', cheque: 'Chèque' };
-  const PAY_VAR = { virement: '--pay-virement', especes: '--pay-especes', cheque: '--pay-cheque', airbnb: '--pay-airbnb' };
+  const CANAUX = { airbnb: 'Airbnb', leboncoin: 'Le Bon Coin', contact: 'Contact direct' };
+  const CANAL_COURT = { airbnb: 'Airbnb', leboncoin: 'Bon Coin', contact: 'Contact' };
+  const PAIEMENTS = { airbnb: 'Airbnb', virement: 'Virement', especes: 'Espèces', cheque: 'Chèque', leboncoin: 'Le Bon Coin' };
+  const PAY_VAR = { virement: '--pay-virement', especes: '--pay-especes', cheque: '--pay-cheque', airbnb: '--pay-airbnb', leboncoin: '--pay-leboncoin' };
   const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   const MOIS_COURT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
@@ -99,6 +100,12 @@
   const inter = (r, a, b) => Math.max(0, Math.min(toN(r.depart), b) - Math.max(toN(r.arrivee), a));
   // Part du montant correspondant à ces nuits (répartition au prorata des nuits)
   const part = (r, a, b) => { const n = nights(r); return n > 0 ? Number(r.tarif_reel) * inter(r, a, b) / n : 0; };
+  // Supplément draps : compté en entier à la date d'arrivée
+  const draps = (r) => Number(r.draps_montant) || 0;
+  const drapsDans = (r, a, b) => { const x = toN(r.arrivee); return x >= a && x < b ? draps(r) : 0; };
+  // Revenu d'une réservation sur [a, b[ : location répartie selon les nuits, plus les draps
+  const rev = (r, a, b) => part(r, a, b) + drapsDans(r, a, b);
+  const totalResa = (r) => Number(r.tarif_reel) + draps(r);
   const byArr = (x, y) => toN(x.arrivee) - toN(y.arrivee) || toN(x.depart) - toN(y.depart);
 
   const canEdit = () => S.role === 'gestion';
@@ -109,6 +116,14 @@
     const pa = partsN(a), pd = partsN(d);
     if (pa.y === pd.y && pa.m === pd.m) return `${pa.d} → ${pd.d} ${MOIS_COURT[pd.m]}`;
     return `${dCourt(a)} → ${dCourt(d)}`;
+  }
+
+  // « du 7 au 12 sept. 2025 », « du 25 nov. au 2 déc. 2025 », « du 29 déc. 2025 au 5 janv. 2026 »
+  function periodeAnnee(r) {
+    const pa = partsN(toN(r.arrivee)), pd = partsN(toN(r.depart));
+    if (pa.y !== pd.y) return `du ${pa.d} ${MOIS_COURT[pa.m]} ${pa.y} au ${pd.d} ${MOIS_COURT[pd.m]} ${pd.y}`;
+    if (pa.m !== pd.m) return `du ${pa.d} ${MOIS_COURT[pa.m]} au ${pd.d} ${MOIS_COURT[pd.m]} ${pd.y}`;
+    return `du ${pa.d} au ${pd.d} ${MOIS_COURT[pd.m]} ${pd.y}`;
   }
 
   function jourRelatif(n, t) {
@@ -239,7 +254,7 @@
       resas: [
         r('Christophe', 1, -62, -48, 1, 'contact', 'virement', 400, true),
         r('Grégory', 1, -26, -24, 2, 'airbnb', 'airbnb', 92.4, true),
-        r('Stéphane', 1, -20, -15, 1, 'contact', 'especes', 225, true),
+        Object.assign(r('Stéphane', 1, -20, -15, 1, 'leboncoin', 'especes', 225, true), { draps_montant: 20, draps_paiement: 'especes' }),
         r('Élodie R.', 1, -13, -8, 2, 'airbnb', 'airbnb', 231, true),
         r('Karim', 1, -6, 0, 2, 'airbnb', 'airbnb', 265.8, true),
         r('Sophie L.', 1, 5, 8, 2, 'airbnb', 'airbnb', 138, false),
@@ -265,6 +280,7 @@
     resas: [],
     lastRoute: 'accueil',
     cal: null,
+    calAnim: null,
     recap: null,
     list: { q: '', apt: 0, due: false },
     started: false
@@ -429,6 +445,8 @@
     view.addEventListener('submit', onSubmit);
     view.addEventListener('input', onInput);
     view.addEventListener('change', onChange);
+    view.addEventListener('touchstart', onTouchStart, { passive: true });
+    view.addEventListener('touchend', onTouchEnd, { passive: true });
   }
 
   let toastTimer;
@@ -488,11 +506,11 @@
     const t = today();
     const p = partsN(t);
     const ma = ymN(p.y, p.m), mb = ymN(p.y, p.m + 1);
-    const rev = sum(S.resas.map((r) => part(r, ma, mb)));
+    const revenu = sum(S.resas.map((r) => rev(r, ma, mb)));
     const nts = sum(S.resas.map((r) => inter(r, ma, mb)));
     const occ = nts / ((mb - ma) * APTS.length);
     const due = S.resas.filter((r) => !r.paye);
-    const dueTotal = sum(due.map((r) => r.tarif_reel));
+    const dueTotal = sum(due.map(totalResa));
     const dueSub = due.length === 0 ? 'Tout est encaissé'
       : due.length === 1 ? `${esc(due[0].client)} · ${(PAIEMENTS[due[0].paiement] || '').toLowerCase()}`
       : plural(due.length, 'réservation');
@@ -516,7 +534,7 @@
             <div class="tiles">
               <button type="button" class="card tile" data-act="recap-mois">
                 <span class="k">Revenus du mois</span>
-                <span class="v">${eur(rev)}</span>
+                <span class="v">${eur(revenu)}</span>
                 <span class="s">${pct(occ)} d'occupation</span>
               </button>
               <button type="button" class="card tile tile-warn" data-act="goto-due">
@@ -613,6 +631,7 @@
   function viewCalendrier() {
     if (!S.cal) { const p = partsN(today()); S.cal = { y: p.y, m: p.m }; }
     const { y, m } = S.cal;
+    const anim = S.calAnim; S.calAnim = null;
     const a = ymN(y, m), b = ymN(y, m + 1), nd = b - a, t = today();
     const rs = S.resas.filter((r) => toN(r.arrivee) < b && toN(r.depart) > a);
     const days = [];
@@ -625,7 +644,7 @@
       let sub;
       if (rd > b) sub = `jusqu'au ${dSlash(rd)}`;
       else if (ra < a) sub = `depuis le ${dSlash(ra)}`;
-      else sub = `${r.canal === 'airbnb' ? 'Airbnb' : 'Contact'} · ${nights(r)} n.`;
+      else sub = `${CANAL_COURT[r.canal] || 'Contact'} · ${nights(r)} n.`;
       const label = `${r.client}, appart ${r.appartement}, du ${dCourt(ra)} au ${dCourt(rd)}`;
       return { s, e, cls, sub, label };
     };
@@ -661,7 +680,7 @@
           ${APTS.map((id) => days.map((d) => addCell(id, d, d.i + 2, id + 1)).join('')).join('')}
           ${rs.map((r) => {
             const k = barInfo(r);
-            const sub2 = k.cls ? k.sub : `${r.canal === 'airbnb' ? 'Airbnb' : 'Contact'} · ${eur(r.tarif_reel)}`;
+            const sub2 = k.cls ? k.sub : `${CANAL_COURT[r.canal] || 'Contact'} · ${eur(totalResa(r))}`;
             return `<button type="button" class="bar a${r.appartement}${k.cls}" data-act="open" data-id="${esc(r.id)}" style="grid-row:${r.appartement + 1};grid-column:${k.s + 2} / ${k.e + 2}" aria-label="${esc(k.label)}" title="${esc(k.label)}"><span class="bar-name">${esc(r.client)}</span><span class="bar-sub">${sub2}</span></button>`;
           }).join('')}
         </div>
@@ -677,9 +696,34 @@
         <span class="month-label">${cap(MOIS[m])} ${y}</span>
         <button type="button" class="icon-btn" data-act="cal-next" aria-label="Mois suivant">${ic('right', 20)}</button>
       </div>
+      <div class="cal-swipe${anim ? ' anim-' + anim : ''}">
       ${vertical}
       ${horizontal}
+      </div>
+      <p class="hint only-mobile">Faites glisser le calendrier vers la gauche ou la droite pour changer de mois.</p>
       ${canEdit() ? '<p class="hint">Touchez une case vide pour ajouter une réservation, ou une réservation pour la modifier.</p>' : ''}`;
+  }
+
+  // Mois suivant (+1) ou précédent (-1), avec un léger glissement dans le sens du geste
+  function changerMois(dir) {
+    const d = new Date(Date.UTC(S.cal.y, S.cal.m + dir, 1));
+    S.cal = { y: d.getUTCFullYear(), m: d.getUTCMonth() };
+    S.calAnim = dir > 0 ? 'next' : 'prev';
+    render();
+  }
+
+  // Glisser le doigt horizontalement sur le calendrier pour changer de mois
+  let swipe = null;
+  function onTouchStart(e) {
+    if (e.touches.length !== 1 || !e.target.closest('.cal-swipe')) { swipe = null; return; }
+    swipe = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function onTouchEnd(e) {
+    if (!swipe || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - swipe.x;
+    const dy = e.changedTouches[0].clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) changerMois(dx < 0 ? 1 : -1);
   }
 
   /* ================================================================
@@ -697,7 +741,7 @@
     const ro = !canEdit();
     const dateParam = params.get('date');
     const aptParam = Number(params.get('apt'));
-    const F = existing ? Object.assign({}, existing, { notes: existing.notes || '' }) : {
+    const F = existing ? Object.assign({}, existing, { notes: existing.notes || '', drapsOn: existing.draps_montant != null }) : {
       client: '',
       appartement: APTS.includes(aptParam) ? aptParam : 1,
       arrivee: isDate(dateParam) ? dateParam : fromN(today()),
@@ -707,7 +751,10 @@
       tarif_reel: '',
       paiement: '',
       paye: false,
-      notes: ''
+      notes: '',
+      drapsOn: false,
+      draps_montant: '',
+      draps_paiement: ''
     };
     const clients = Array.from(new Set(S.resas.map((r) => r.client.trim()))).sort((x, y) => x.localeCompare(y, 'fr'));
     const radio = (attr, val, cur, label, cls) => `<button type="button" role="radio" ${attr}="${val}" aria-checked="${String(val) === String(cur)}"${cls ? ` class="${cls}"` : ''}>${label}</button>`;
@@ -752,8 +799,8 @@
 
           <section class="card fsec">
             <span class="label" id="lbl-canal">Canal de réservation</span>
-            <div class="seg" role="radiogroup" aria-labelledby="lbl-canal">
-              ${radio('data-canal', 'airbnb', F.canal, 'Airbnb')}${radio('data-canal', 'contact', F.canal, 'Contact direct')}
+            <div class="seg seg-3" role="radiogroup" aria-labelledby="lbl-canal">
+              ${Object.keys(CANAUX).map((k) => radio('data-canal', k, F.canal, CANAUX[k])).join('')}
             </div>
             <div class="field">
               <label for="f-reel" id="lbl-reel">Tarif</label>
@@ -770,6 +817,22 @@
             <span class="label" id="lbl-statut">Statut</span>
             <div class="seg" role="radiogroup" aria-labelledby="lbl-statut">
               ${radio('data-paye', '1', F.paye ? '1' : '0', 'Payé')}${radio('data-paye', '0', F.paye ? '1' : '0', 'À encaisser', 'warn')}
+            </div>
+          </section>
+
+          <section class="card fsec">
+            <button type="button" class="toggle" id="f-draps-toggle" aria-pressed="${F.drapsOn}">
+              <span class="toggle-box" aria-hidden="true">${ic('check', 16)}</span>Supplément draps
+            </button>
+            <div id="f-draps" class="stack"${F.drapsOn ? '' : ' hidden'}>
+              <div class="field">
+                <label for="f-draps-mt">Montant des draps</label>
+                <div class="money"><input id="f-draps-mt" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(montantInput(F.draps_montant))}"><span aria-hidden="true">€</span></div>
+              </div>
+              <span class="label" id="lbl-draps-pay">Paiement des draps</span>
+              <div class="pay-pick" role="radiogroup" aria-labelledby="lbl-draps-pay">
+                ${Object.keys(PAIEMENTS).map((k) => radio('data-dpay', k, F.draps_paiement, PAIEMENTS[k])).join('')}
+              </div>
             </div>
           </section>
 
@@ -822,7 +885,7 @@
       const past = key ? S.resas.filter((r) => r.client.trim().toLowerCase() === key && (!existing || r.id !== existing.id)).sort((x, y) => byArr(y, x)) : [];
       if (past.length) {
         const l = past[0];
-        hint.innerHTML = `${ic('user', 18)}<span><strong>Client connu</strong> · ${plural(past.length, 'séjour')}, dernier du ${dCourt(toN(l.arrivee))} au ${dCourt(toN(l.depart))} (appart ${l.appartement})</span>`;
+        hint.innerHTML = `${ic('user', 18)}<span><strong>Client connu</strong> · ${plural(past.length, 'séjour')}, dernier ${periodeAnnee(l)} (appart ${l.appartement})</span>`;
         hint.hidden = false;
       } else {
         hint.hidden = true;
@@ -846,6 +909,14 @@
         F.paiement = b.dataset.pay; setChecked('data-pay', F.paiement);
       } else if (b.dataset.paye) {
         F.paye = b.dataset.paye === '1'; setChecked('data-paye', b.dataset.paye);
+      } else if (b.id === 'f-draps-toggle') {
+        F.drapsOn = !F.drapsOn;
+        b.setAttribute('aria-pressed', String(F.drapsOn));
+        $('#f-draps').hidden = !F.drapsOn;
+        if (F.drapsOn && !F.draps_paiement && F.paiement) { F.draps_paiement = F.paiement; setChecked('data-dpay', F.draps_paiement); }
+        if (F.drapsOn) $('#f-draps-mt').focus({ preventScroll: true });
+      } else if (b.dataset.dpay) {
+        F.draps_paiement = b.dataset.dpay; setChecked('data-dpay', F.draps_paiement);
       }
     });
 
@@ -872,6 +943,9 @@
       if (!isDate(F.arrivee) || !isDate(F.depart)) manque.push('les dates');
       if (isNaN(reel) || reel < 0) manque.push('le tarif');
       if (!F.paiement) manque.push('le mode de paiement');
+      const dm = parseMontant($('#f-draps-mt').value);
+      if (F.drapsOn && (isNaN(dm) || dm < 0)) manque.push('le montant des draps');
+      if (F.drapsOn && !F.draps_paiement) manque.push('le paiement des draps');
       let msg = manque.length ? `Il manque ${manque.join(', ')}.` : '';
       if (!msg && nb <= 0) msg = "La date de départ doit être après la date d'arrivée.";
       if (!msg && conflit(F.appartement, F.arrivee, F.depart, existing && existing.id)) msg = 'Cet appartement est déjà réservé sur ces dates.';
@@ -887,6 +961,8 @@
         canal: F.canal,
         tarif_reel: round2(reel),
         paiement: F.paiement,
+        draps_montant: F.drapsOn ? round2(dm) : null,
+        draps_paiement: F.drapsOn ? F.draps_paiement : null,
         paye: F.paye,
         notes: F.notes.trim() || null
       };
@@ -939,7 +1015,7 @@
       .sort((x, y) => byArr(y, x));
     if (!rs.length) return `<p class="empty card">${S.resas.length ? 'Aucune réservation ne correspond.' : 'Aucune réservation pour le moment.'}</p>`;
 
-    const summary = `<p class="summary">${plural(rs.length, 'réservation')} · ${eur(sum(rs.map((r) => r.tarif_reel)))}${L.due ? ' à encaisser' : ''}</p>`;
+    const summary = `<p class="summary">${plural(rs.length, 'réservation')} · ${eur(sum(rs.map(totalResa)))}${L.due ? ' à encaisser' : ''}</p>`;
     const groups = [];
     rs.forEach((r) => {
       const p = partsN(toN(r.arrivee));
@@ -961,8 +1037,8 @@
     return `<button type="button" class="row" data-act="open" data-id="${esc(r.id)}">
       <span class="badge sm a${r.appartement}">${r.appartement}</span>
       <span class="row-main"><span class="row-title">${esc(r.client)}</span>
-        <span class="row-sub">${range(r)} · ${plural(nights(r), 'nuit')} · ${r.personnes} pers.</span></span>
-      <span class="row-end"><span class="row-amount">${eur(r.tarif_reel)}</span>${status}</span>
+        <span class="row-sub">${range(r)} · ${plural(nights(r), 'nuit')} · ${r.personnes} pers.${draps(r) > 0 ? ' · draps' : ''}</span></span>
+      <span class="row-end"><span class="row-amount">${eur(totalResa(r))}</span>${status}</span>
     </button>`;
   }
 
@@ -994,9 +1070,12 @@
     const { a, b, label } = recapPeriod();
     const days = b - a;
     const rs = S.resas.filter((r) => inter(r, a, b) > 0);
-    const total = sum(rs.map((r) => part(r, a, b)));
+    const total = sum(rs.map((r) => rev(r, a, b)));
+    const location = sum(rs.map((r) => part(r, a, b)));
     const nts = sum(rs.map((r) => inter(r, a, b)));
-    const dueP = sum(rs.filter((r) => !r.paye).map((r) => part(r, a, b)));
+    const dueP = sum(rs.filter((r) => !r.paye).map((r) => rev(r, a, b)));
+    const avecDraps = rs.filter((r) => drapsDans(r, a, b) > 0);
+    const totalDraps = sum(avecDraps.map((r) => drapsDans(r, a, b)));
     const occ = nts / (days * APTS.length);
 
     const types = [['mois', 'Mois'], ['semestre', 'Semestre'], ['annee', 'Année'], ['perso', 'Période']];
@@ -1016,7 +1095,7 @@
     for (let p = partsN(a), y = p.y, m = p.m; ymN(y, m) < b; m++) {
       const ma = Math.max(ymN(y, m), a), mb = Math.min(ymN(y, m + 1), b);
       const q = partsN(ymN(y, m));
-      months.push({ label: MOIS_COURT[q.m], full: `${cap(MOIS[q.m])} ${q.y}`, v: APTS.map((id) => sum(rs.filter((r) => r.appartement === id).map((r) => part(r, ma, mb)))) });
+      months.push({ label: MOIS_COURT[q.m], full: `${cap(MOIS[q.m])} ${q.y}`, v: APTS.map((id) => sum(rs.filter((r) => r.appartement === id).map((r) => rev(r, ma, mb)))) });
     }
     const maxM = Math.max(1, ...months.map((mo) => sum(mo.v)));
     const legend = `<div class="legend">${APTS.map((id) => `<span class="a${id}"><i class="sw"></i>Appart ${id}</span>`).join('')}</div>`;
@@ -1034,7 +1113,7 @@
 
     const parApt = APTS.map((id) => {
       const x = rs.filter((r) => r.appartement === id);
-      const v = sum(x.map((r) => part(r, a, b)));
+      const v = sum(x.map((r) => rev(r, a, b)));
       const n = sum(x.map((r) => inter(r, a, b)));
       const o = n / days;
       return `<div class="apt-line a${id}">
@@ -1045,7 +1124,10 @@
       </div>`;
     }).join('');
 
-    const pay = Object.keys(PAIEMENTS).map((k) => ({ k, v: sum(rs.filter((r) => r.paiement === k).map((r) => part(r, a, b))) }));
+    // Chaque montant va dans son mode de paiement : la location dans celui de la réservation, les draps dans le leur
+    const pay = Object.keys(PAIEMENTS).map((k) => ({ k, v:
+      sum(rs.filter((r) => r.paiement === k).map((r) => part(r, a, b)))
+      + sum(avecDraps.filter((r) => (r.draps_paiement || r.paiement) === k).map((r) => drapsDans(r, a, b))) }));
     const payBar = total > 0 ? pay.filter((x) => x.v > 0).map((x) => `<i style="width:${(x.v / total * 100).toFixed(2)}%;background:var(${PAY_VAR[x.k]})"></i>`).join('') : '';
     const payLines = pay.map((x) => `<div class="pay-line"><i class="sw" style="background:var(${PAY_VAR[x.k]})"></i><span class="l">${PAIEMENTS[x.k]}${x.k === 'airbnb' ? ' (net)' : ''}</span><strong>${eur(x.v)}</strong><span class="p">${total > 0 ? pct(x.v / total) : '0 %'}</span></div>`).join('');
 
@@ -1061,7 +1143,7 @@
         <div class="hero-stats">
           <div><b>${nts}</b><span>nuits louées</span></div>
           <div><b>${pct(occ)}</b><span>d'occupation</span></div>
-          <div><b>${nts ? eur(total / nts) : '–'}</b><span>par nuit en moyenne</span></div>
+          <div><b>${nts ? eur(location / nts) : '–'}</b><span>par nuit en moyenne</span></div>
         </div>
         ${dueP > 0.005 ? `<div class="due">Dont ${eur(dueP)} encore à encaisser</div>` : ''}
       </section>
@@ -1069,8 +1151,19 @@
         ${chart}
         <section class="card rsec"><h2 class="h2">Par appartement</h2><div>${parApt}</div></section>
         <section class="card rsec"><h2 class="h2">Par mode de paiement</h2><div class="paybar">${payBar}</div><div class="stack">${payLines}</div></section>
+        <section class="card rsec">
+          <h2 class="h2">Supplément draps</h2>
+          <div class="draps-sum">
+            <div><b>${avecDraps.length}</b><span>${avecDraps.length > 1 ? 'draps loués' : 'drap loué'}</span></div>
+            <div><b>${eur(totalDraps)}</b><span>au total</span></div>
+          </div>
+          ${avecDraps.length ? `<div class="stack">${APTS.map((id) => {
+            const x = avecDraps.filter((r) => r.appartement === id);
+            return x.length ? `<div class="pay-line a${id}"><i class="sw"></i><span class="l">${esc(apt(id).nom)} · ${x.length}</span><strong>${eur(sum(x.map((r) => drapsDans(r, a, b))))}</strong></div>` : '';
+          }).join('')}</div>` : '<p class="small muted">Aucun supplément draps sur cette période.</p>'}
+        </section>
       </div>
-      <p class="small muted" style="margin-top:14px">Un séjour à cheval sur deux périodes est réparti selon le nombre de nuits passées dans chacune.</p>
+      <p class="small muted" style="margin-top:14px">Un séjour à cheval sur deux périodes est réparti selon le nombre de nuits passées dans chacune. Les draps sont comptés à la date d'arrivée, et inclus dans les revenus.</p>
       <div class="actions-row no-print">
         <button type="button" class="btn btn-outline" data-act="export-period">${ic('download', 18)}Excel</button>
         <button type="button" class="btn btn-outline" data-act="print">${ic('print', 18)}PDF / Imprimer</button>
@@ -1136,13 +1229,13 @@
     };
     const cell = (v) => { const s = String(v == null ? '' : v); return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const num = (x) => (x == null || x === '' ? '' : round2(Number(x)).toFixed(2).replace('.', ','));
-    const head = ['Client', 'Appartement', 'Arrivée', 'Départ', 'Nuits', 'Personnes', 'Canal', 'Paiement', 'Statut', 'Tarif']
+    const head = ['Client', 'Appartement', 'Arrivée', 'Départ', 'Nuits', 'Personnes', 'Canal', 'Paiement', 'Statut', 'Tarif', 'Draps', 'Paiement draps']
       .concat(withPeriod ? ['Nuits dans la période', 'Montant sur la période'] : [], ['Notes']);
     const lines = rs.slice().sort(byArr).map((r) => [
       txt(r.client), r.appartement, dFr(r.arrivee), dFr(r.depart), nights(r), r.personnes,
       CANAUX[r.canal] || r.canal, PAIEMENTS[r.paiement] || r.paiement, r.paye ? 'Payé' : 'À encaisser',
-      num(r.tarif_reel)
-    ].concat(withPeriod ? [inter(r, a, b), num(part(r, a, b))] : [], [txt(r.notes)]).map(cell).join(';'));
+      num(r.tarif_reel), draps(r) ? num(draps(r)) : '', draps(r) ? (PAIEMENTS[r.draps_paiement] || '') : ''
+    ].concat(withPeriod ? [inter(r, a, b), num(rev(r, a, b))] : [], [txt(r.notes)]).map(cell).join(';'));
     const csv = '﻿' + [head.map(cell).join(';')].concat(lines).join('\r\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a');
@@ -1170,10 +1263,7 @@
         try { await S.store.remove(r.id); await reload(); toast('Réservation supprimée'); goBack(); } catch (ex) { toast(traduireErreur(ex), true); el.disabled = false; }
         break;
       }
-      case 'cal-prev': case 'cal-next': {
-        const d = new Date(Date.UTC(S.cal.y, S.cal.m + (act === 'cal-next' ? 1 : -1), 1));
-        S.cal = { y: d.getUTCFullYear(), m: d.getUTCMonth() }; render(); break;
-      }
+      case 'cal-prev': case 'cal-next': changerMois(act === 'cal-next' ? 1 : -1); break;
       case 'cal-today': S.cal = null; render(); break;
       case 'cal-add': go(`#/nouvelle?apt=${el.dataset.apt}&date=${el.dataset.date}`); break;
       case 'list-all': S.list.apt = 0; S.list.due = false; render(); break;

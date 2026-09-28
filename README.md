@@ -18,12 +18,15 @@ Application de gestion des réservations des trois appartements : saisie des ré
 | `sw.js`, `manifest.webmanifest`, `icons/` | Installation sur l'écran d'accueil |
 | `supabase/1-schema.sql` | Création de la base (tables, règles de sécurité) |
 | `supabase/2-acces.sql` | Qui a accès, et avec quel rôle |
+| `supabase/3-draps-leboncoin.sql` | Mise à jour du 28/09/2026 : supplément draps, Le Bon Coin |
 | `.github/workflows/garder-actif.yml` | Empêche la mise en pause de la base gratuite |
 
 ## Règles de calcul
 
 - **Nuits** : date de départ moins date d'arrivée. Le jour du départ est libre pour une nouvelle arrivée.
 - **Tarif** : saisi à la main à chaque réservation. Pour Airbnb, c'est le montant net reçu. (Les colonnes `tarif_theorique` et `tarif_*` de la base ne sont plus utilisées.)
+- **Supplément draps** : montant et mode de paiement propres, compté en entier à la date d'arrivée et inclus dans les revenus. Le Récap affiche le nombre de draps loués et leur total.
+- **Canaux** : Airbnb, Le Bon Coin, contact direct. Le Bon Coin est aussi un mode de paiement.
 - **Récap** : un séjour à cheval sur deux mois est réparti selon le nombre de nuits passées dans chaque mois.
 - **Occupation** : nuits louées ÷ (jours de la période × 3 appartements).
 
