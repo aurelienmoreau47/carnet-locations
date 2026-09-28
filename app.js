@@ -17,6 +17,9 @@
   const CANAUX = { airbnb: 'Airbnb', leboncoin: 'Le Bon Coin', contact: 'Contact direct' };
   const CANAL_COURT = { airbnb: 'Airbnb', leboncoin: 'Bon Coin', contact: 'Contact' };
   const PAIEMENTS = { airbnb: 'Airbnb', virement: 'Virement', especes: 'Espèces', cheque: 'Chèque', leboncoin: 'Le Bon Coin' };
+  // Ordre d'affichage dans le formulaire : du plus utilisé au moins utilisé (historique 2021-2026)
+  const PAY_ORDRE = ['especes', 'airbnb', 'virement', 'cheque', 'leboncoin'];
+  const DRAPS_PAY = ['especes', 'virement', 'cheque'];
   const PAY_VAR = { virement: '--pay-virement', especes: '--pay-especes', cheque: '--pay-cheque', airbnb: '--pay-airbnb', leboncoin: '--pay-leboncoin' };
   const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   const MOIS_COURT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -811,8 +814,8 @@
 
           <section class="card fsec">
             <span class="label" id="lbl-pay">Mode de paiement</span>
-            <div class="pay-pick" role="radiogroup" aria-labelledby="lbl-pay">
-              ${Object.keys(PAIEMENTS).map((k) => radio('data-pay', k, F.paiement, PAIEMENTS[k])).join('')}
+            <div class="pay-pick pay-5" role="radiogroup" aria-labelledby="lbl-pay">
+              ${PAY_ORDRE.map((k) => radio('data-pay', k, F.paiement, PAIEMENTS[k])).join('')}
             </div>
             <span class="label" id="lbl-statut">Statut</span>
             <div class="seg" role="radiogroup" aria-labelledby="lbl-statut">
@@ -830,8 +833,8 @@
                 <div class="money"><input id="f-draps-mt" inputmode="decimal" autocomplete="off" placeholder="0,00" value="${esc(montantInput(F.draps_montant))}"><span aria-hidden="true">€</span></div>
               </div>
               <span class="label" id="lbl-draps-pay">Paiement des draps</span>
-              <div class="pay-pick" role="radiogroup" aria-labelledby="lbl-draps-pay">
-                ${Object.keys(PAIEMENTS).map((k) => radio('data-dpay', k, F.draps_paiement, PAIEMENTS[k])).join('')}
+              <div class="pay-pick pay-3" role="radiogroup" aria-labelledby="lbl-draps-pay">
+                ${DRAPS_PAY.map((k) => radio('data-dpay', k, F.draps_paiement, PAIEMENTS[k])).join('')}
               </div>
             </div>
           </section>
@@ -913,7 +916,7 @@
         F.drapsOn = !F.drapsOn;
         b.setAttribute('aria-pressed', String(F.drapsOn));
         $('#f-draps').hidden = !F.drapsOn;
-        if (F.drapsOn && !F.draps_paiement && F.paiement) { F.draps_paiement = F.paiement; setChecked('data-dpay', F.draps_paiement); }
+        if (F.drapsOn && !F.draps_paiement && DRAPS_PAY.includes(F.paiement)) { F.draps_paiement = F.paiement; setChecked('data-dpay', F.draps_paiement); }
         if (F.drapsOn) $('#f-draps-mt').focus({ preventScroll: true });
       } else if (b.dataset.dpay) {
         F.draps_paiement = b.dataset.dpay; setChecked('data-dpay', F.draps_paiement);
@@ -945,7 +948,7 @@
       if (!F.paiement) manque.push('le mode de paiement');
       const dm = parseMontant($('#f-draps-mt').value);
       if (F.drapsOn && (isNaN(dm) || dm < 0)) manque.push('le montant des draps');
-      if (F.drapsOn && !F.draps_paiement) manque.push('le paiement des draps');
+      if (F.drapsOn && !DRAPS_PAY.includes(F.draps_paiement)) manque.push('le paiement des draps');
       let msg = manque.length ? `Il manque ${manque.join(', ')}.` : '';
       if (!msg && nb <= 0) msg = "La date de départ doit être après la date d'arrivée.";
       if (!msg && conflit(F.appartement, F.arrivee, F.depart, existing && existing.id)) msg = 'Cet appartement est déjà réservé sur ces dates.';
