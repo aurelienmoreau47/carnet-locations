@@ -378,10 +378,11 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; }
   height: 48px; border-radius: 12px; border: 1.5px solid var(--line);
   background: var(--surface); font-size: 15px; font-weight: 600;
 }
-/* 5 modes : les 3 plus utilisés sur la 1re ligne, les 2 autres plus larges sur la 2e */
+/* 5 modes : les 2 plus utilisés en grand sur la 1re ligne, les 3 autres sur la 2e */
 .pay-pick.pay-5 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .pay-5 button { grid-column: span 2; }
-.pay-5 button:nth-child(n+4) { grid-column: span 3; }
+.pay-5 button:nth-child(-n+2) { grid-column: span 3; }
+.pay-5 button:nth-child(n+3) { padding: 0 4px; font-size: 14px; white-space: nowrap; }
 .pay-pick.pay-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .pay-pick button[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700; }
 .hint-box { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--bg); font-size: 13px; color: var(--ink-2); }
