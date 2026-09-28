@@ -567,7 +567,7 @@
       title = esc(cur.client);
       sub = d === t + 1 ? 'Départ demain' : `Jusqu'au ${dJour(d)}`;
       if (toN(cur.arrivee) === t) sub = "Arrivée aujourd'hui · " + sub;
-      pill = `<span class="pill pill-lg pill-apt">Occupé</span>`;
+      pill = '<span class="pill pill-lg pill-busy">Occupé</span>';
       target = cur.id;
     } else if (leaving) {
       title = esc(leaving.client);

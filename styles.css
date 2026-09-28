@@ -176,7 +176,7 @@ button.card:hover, a.card:hover { border-color: #D6CCBA; }
 .pill-lg { padding: 5px 10px; font-size: 13px; font-weight: 700; }
 .pill-ok { background: var(--ok-tint); color: var(--ok); }
 .pill-warn { background: var(--warn-tint); color: var(--warn); font-weight: 700; }
-.pill-apt { background: var(--t); color: var(--i); }
+.pill-busy { background: var(--danger-tint); color: var(--danger); font-weight: 700; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 50;
