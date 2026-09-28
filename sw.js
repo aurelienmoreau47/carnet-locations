@@ -1,7 +1,7 @@
 // Service worker : rend l'application installable et garde l'interface
 // disponible si le réseau coupe. Les données, elles, viennent toujours de Supabase.
 // Réseau d'abord, pour que chaque mise à jour de l'appli arrive tout de suite.
-const CACHE = 'carnet-v2';
+const CACHE = 'carnet-v3';
 const FILES = [
   './',
   'index.html',
@@ -10,6 +10,8 @@ const FILES = [
   'config.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
+  'icons/favicon-48.png',
+  'icons/logo.svg',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png'
 ];

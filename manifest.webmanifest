@@ -1,6 +1,6 @@
 {
-  "name": "Carnet des locations",
-  "short_name": "Locations",
+  "name": "Appartements Valence",
+  "short_name": "Appartements",
   "description": "Réservations, calendrier et récap des trois appartements.",
   "lang": "fr",
   "start_url": "./",

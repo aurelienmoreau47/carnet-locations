@@ -1,4 +1,4 @@
-# Carnet des locations
+# Appartements Valence
 
 Application de gestion des réservations des trois appartements : saisie des réservations, calendrier, liste, récap financier. Elle marche sur téléphone et sur ordinateur, et s'installe comme une application.
 

@@ -1,4 +1,4 @@
-/* Carnet des locations
+/* Appartements Valence
  * Application de gestion des réservations des trois appartements.
  * JavaScript sans dépendance de build : se sert tel quel par GitHub Pages.
  * Données : Supabase (en ligne) ou navigateur (mode démo, si config.js est vide).
@@ -13,6 +13,7 @@
   const CFG = window.CARNET_CONFIG || {};
   const CLOUD = Boolean(CFG.supabaseUrl && CFG.supabaseKey);
 
+  const NOM = 'Appartements Valence';
   const APTS = [1, 2, 3];
   const CANAUX = { airbnb: 'Airbnb', leboncoin: 'Le Bon Coin', contact: 'Contact direct' };
   const CANAL_COURT = { airbnb: 'Airbnb', leboncoin: 'Bon Coin', contact: 'Contact' };
@@ -354,14 +355,14 @@
    * Écrans hors application : connexion, erreurs
    * ================================================================ */
 
-  const brandMark = '<div class="brand-mark" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>';
+  const brandMark = '<img class="brand-mark" src="icons/logo.svg" alt="" width="72" height="72">';
 
   function renderLogin() {
     app().innerHTML = `
       <main class="login">
         <div class="login-card">
           ${brandMark}
-          <h1 class="h1">Carnet des locations</h1>
+          <h1 class="h1">${NOM}</h1>
           <p class="muted">Connectez-vous pour accéder aux réservations.</p>
           <form id="login-form" novalidate>
             <div class="field">
@@ -428,7 +429,7 @@
       ${CLOUD ? '' : '<div class="demo-banner">Mode démo : les données restent sur cet appareil et ne sont pas partagées.</div>'}
       <div class="shell">
         <aside class="sidebar">
-          <div class="brand">Carnet des locations</div>
+          <div class="brand"><img src="icons/logo.svg" alt="" width="40" height="40">${NOM}</div>
           ${canEdit() ? `<a class="btn btn-primary btn-block" href="#/nouvelle">${ic('plus', 20)}Nouvelle réservation</a>` : ''}
           <nav class="side-nav" aria-label="Navigation principale">
             ${NAV.map((n) => `<a href="#/${n.r}" data-nav="${n.r}">${ic(n.i, 20)}<span>${n.t}</span></a>`).join('')}
@@ -1136,7 +1137,7 @@
 
     return `
       <header class="page-head"><h1 class="h1">Récap</h1></header>
-      <p class="print-only"><strong>Carnet des locations · Récap · ${label}</strong></p>
+      <p class="print-only"><strong>${NOM} · Récap · ${label}</strong></p>
       <div class="seg seg-4 no-print" role="group" aria-label="Type de période">
         ${types.map(([k, t]) => `<button type="button" data-act="recap-type" data-v="${k}" aria-pressed="${R.type === k}">${t}</button>`).join('')}
       </div>

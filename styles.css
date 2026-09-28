@@ -1,4 +1,4 @@
-/* Carnet des locations : styles */
+/* Appartements Valence : styles */
 
 :root {
   --bg: #F6F2EA;
@@ -107,7 +107,8 @@ body.is-form .view { padding-bottom: 40px; }
   .only-mobile { display: none !important; }
 }
 
-.brand { font-family: var(--serif); font-size: 22px; font-weight: 600; line-height: 1.15; padding: 0 8px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 4px; font-family: var(--serif); font-size: 20px; font-weight: 600; line-height: 1.15; }
+.brand img { flex-shrink: 0; border-radius: 10px; }
 .side-nav { display: flex; flex-direction: column; gap: 4px; }
 .side-nav a {
   height: 44px; padding: 0 12px; border-radius: 10px;
@@ -507,8 +508,7 @@ button.row-static:hover { background: #FBF9F5; }
 .login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 20px; }
 .login-card { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 16px; }
 .login form { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
-.brand-mark { display: flex; gap: 6px; }
-.brand-mark i { width: 14px; height: 44px; border-radius: 5px; background: var(--c); }
+.brand-mark { display: block; width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 2px 8px rgba(31, 42, 46, 0.12); }
 
 /* ---------- Impression (PDF du récap) ---------- */
 
