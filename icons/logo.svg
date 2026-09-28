@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Appartements Valence">
-  <rect width="512" height="512" fill="#F6F2EA"/>
+  <rect width="512" height="512" fill="#1F2A2E"/>
   <!-- toit -->
-  <polygon points="256,108 408,208 104,208" fill="#1F2A2E"/>
+  <polygon points="256,61 458,183 54,183" fill="#F6F2EA"/>
   <!-- R+1 : appartement 1 -->
-  <rect x="131" y="214" width="250" height="60" rx="4" fill="#B4472F"/>
+  <rect x="86" y="191" width="340" height="82" rx="9" fill="#D0694F"/>
   <!-- RDC : appartement 2, avec la porte -->
-  <rect x="131" y="279" width="250" height="60" rx="4" fill="#2E5A87"/>
-  <rect x="236" y="297" width="40" height="42" rx="3" fill="#F6F2EA"/>
+  <rect x="86" y="281" width="340" height="82" rx="9" fill="#5B8BBF"/>
+  <rect x="228" y="299" width="56" height="64" rx="6" fill="#1F2A2E"/>
   <!-- R-1 : appartement 3 -->
-  <rect x="131" y="344" width="250" height="60" rx="4" fill="#4C7632"/>
+  <rect x="86" y="371" width="340" height="82" rx="9" fill="#79A35A"/>
 </svg>
